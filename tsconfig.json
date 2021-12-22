@@ -25,7 +25,11 @@
 			"phaser"
 		]
 	},
+	"exclude": [
+		"src/client"
+	],
 	"include": [
-		"src/**/*"
+		"src/server/**/*",
+		"src/world/**/*"
 	]
 }
