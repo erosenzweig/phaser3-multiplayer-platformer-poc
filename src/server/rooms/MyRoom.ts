@@ -8,10 +8,13 @@ export class MyRoom extends Room<MyRoomState> {
   onCreate (options: any) {
     this.setState(new MyRoomState());
 
-    this.onMessage("client_button_down", (client, message) => {
-      this.broadcast('keydown', message, { except: client});
-    });
+    this.onMessage("client_input", (client, message) => {
+      console.log(`Got message from client ${client.sessionId}`);
+      console.log(message);
 
+      // move client based on controller input
+      this.broadcast("echo", message, {except: client});
+    });
   }
 
   onJoin (client: Client, options: any) {

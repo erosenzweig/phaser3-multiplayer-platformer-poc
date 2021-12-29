@@ -654,6 +654,7 @@ const GamePad = (function(){
             map["y-dir"] = Math.round(map["y-axis"]);
 
             events.trigger('stick-touchmove', {
+              "name": "stick",
               "x-axis": map["x-axis"],
               "y-axis": map["y-axis"],
               "x-dir": map["x-dir"],
