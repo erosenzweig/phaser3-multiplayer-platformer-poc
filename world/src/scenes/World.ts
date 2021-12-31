@@ -4,6 +4,9 @@ import 'regenerator-runtime/runtime'
 import TextureKeys from '../consts/TextureKeys'
 import SceneKeys from '~/consts/SceneKeys'
 import AnimiationKeys from '~/consts/AnimationKeys'
+import Player from '~/player/Player'
+import MessageTypes from '~/../../shared/MessageTypes'
+import { IPlayerInputMessage } from '~/types/IPlayerInputMessage'
 
 export default class WorldScene extends Phaser.Scene
 {
@@ -11,19 +14,16 @@ export default class WorldScene extends Phaser.Scene
     bgHills1!: Phaser.GameObjects.TileSprite
     bgHills2!: Phaser.GameObjects.TileSprite
     bgTrees!: Phaser.GameObjects.TileSprite
-	players!: Map<string, Colyseus.Client>
+	players!: Map<string, Player>
 	ground!: Phaser.Physics.Arcade.StaticGroup
 	groundZone!: Phaser.GameObjects.Zone
     map!: Phaser.Tilemaps.Tilemap
     
     client!: Colyseus.Client
+    room!: Colyseus.Room
 
-    cursors!: Phaser.Types.Input.Keyboard.CursorKeys
-    debugPlayer!: Phaser.Physics.Matter.Sprite
-    doubleJumpCounter!: number
-    playerIsJumping!: boolean
-    playerIsGrounded!: boolean
-
+    player_spawn_point?: Phaser.Types.Tilemaps.TiledObject
+    
 	constructor()
 	{
 		super(SceneKeys.World)
@@ -31,11 +31,7 @@ export default class WorldScene extends Phaser.Scene
 
     init()
     {
-        //this.client = new Colyseus.Client('ws://localhost:2567')
-        this.cursors = this.input.keyboard.createCursorKeys()
-        this.playerIsGrounded = false
-        this.playerIsJumping = false
-        this.doubleJumpCounter = 1
+        this.client = new Colyseus.Client('ws://localhost:2567')
     }
 
 	preload()
@@ -43,8 +39,17 @@ export default class WorldScene extends Phaser.Scene
         
     }
 
-    create()
+    async create()
     {
+        // Colyseus
+        // Connect this client world renderer to Colyseus game server
+        this.room = await this.client.joinOrCreate('my_room', {"is_world_client": 1})
+
+        console.log(`joined room: ${this.room.name}`)
+
+        this.room.onMessage('keydown', this.handleServerMessage)
+
+        // Tilemaps / World 
         // Animated Tilemaps Reference
         // https://phaser.discourse.group/t/how-to-show-tilemap-animated-tiles-in-phaser-game/9972/2
 
@@ -57,87 +62,23 @@ export default class WorldScene extends Phaser.Scene
 
         this.matter.world.convertTilemapLayer(groundLayer)
 
-        this.createPlayerAnims()
-
+        // save important object points from tilemap
         objectsLayer.objects.forEach(objData => {
-            const { x = 0, y = 0, name, width = 0 } = objData
+            const { name } = objData
 
             if(name == "player-spawn")
-            {
-                this.debugPlayer = this.matter.add.sprite(x + (width * 0.5), y, AnimiationKeys.Player_Idle).play(AnimiationKeys.Player_Idle).setFixedRotation()
-
-                this.debugPlayer.setOnCollide((data: MatterJS.ICollisionPair) => {
-                    this.playerIsGrounded = true
-                })
-            }
+                this.player_spawn_point = objData
         })
 
-        // const room = await this.client.joinOrCreate('my_room', {"is_world_client": 1})
-
-        // console.log(`joined room: ${room.name}`)
-
-        // room.onMessage('keydown', message => {
-        //     console.log(`message received: ${message}`)
-        // })
-
-        // this.input.keyboard.on(Phaser.Input.Keyboard.Events.ANY_KEY_DOWN, (evt: KeyboardEvent) => {
-        //     console.log(`Sending key ${evt.key} to server`)
-        //     room.send('keydown', evt.key)
-        // })
+        // Animations
+        // Load player animations into scene 
+        this.createPlayerAnims()
     }
 
     update(time: number, delta: number): void {
-        this.updatePlayer()
-    }
-
-    updatePlayer()
-    {
-        if(!this.debugPlayer)
-            return
-
-        const speed = 3
-        const jumpForce = -6
-
-        const jumpJustPressed = Phaser.Input.Keyboard.JustDown(this.cursors.space)
-
-        if(jumpJustPressed && this.playerIsGrounded)
-        {
-            this.debugPlayer.setVelocityY(jumpForce)
-            this.debugPlayer.play(AnimiationKeys.Player_Jump, true)
-            this.playerIsGrounded = false
-        }
-        else if(jumpJustPressed && this.doubleJumpCounter > 0 && !this.playerIsGrounded)
-        {
-            this.debugPlayer.setVelocityY(jumpForce * 1.1)
-            this.debugPlayer.play(AnimiationKeys.Player_DoubleJump, true)
-            this.doubleJumpCounter -= 1
-        }
-        else if(this.cursors.left.isDown)
-        {
-            this.debugPlayer.setVelocityX(-speed)
-            this.debugPlayer.flipX = true
-
-            if(this.playerIsGrounded)
-                this.debugPlayer.play(AnimiationKeys.Player_Run, true)
-        }
-        else if(this.cursors.right.isDown)
-        {
-            this.debugPlayer.setVelocityX(speed)
-            this.debugPlayer.flipX = false
-            
-            if(this.playerIsGrounded)
-                this.debugPlayer.play(AnimiationKeys.Player_Run, true)
-        }
-        else if(this.playerIsGrounded) {
-            if(this.debugPlayer.anims.currentAnim.key === AnimiationKeys.Player_Jump || this.debugPlayer.anims.currentAnim.key === AnimiationKeys.Player_DoubleJump)
-                this.debugPlayer.playAfterRepeat(AnimiationKeys.Player_Idle)
-            else
-                this.debugPlayer.play(AnimiationKeys.Player_Idle)
-
-            this.doubleJumpCounter = 1
-            this.playerIsGrounded = true
-            this.playerIsJumping = false
-        }
+        this.players.forEach(player => {
+            player.updatePlayer()
+        })
     }
 
     createPlayerAnims()
@@ -193,6 +134,45 @@ export default class WorldScene extends Phaser.Scene
             frameRate: 12,
             repeat: -1
         })
+    }
 
+    handleServerMessage(message: any)
+    {
+        if(!message.clientId)
+            return
+        if(!message.msgType)
+            return
+        
+        if(message.msgType === MessageTypes.Player_Input_Update)
+        {
+            this.players[message.clientId].setInput(message as IPlayerInputMessage)
+        }
+        else if(message.msgType === MessageTypes.Player_Connected) 
+        {
+            if(!this.player_spawn_point) {
+                console.log("No player spawn point set")
+                return
+            }
+
+            // create new player sprite
+            var playerSprite = this.matter.add.sprite((this.player_spawn_point.x || 0) + ((this.player_spawn_point.width || 0) * 0.5), (this.player_spawn_point.y || 0), AnimiationKeys.Player_Idle).play(AnimiationKeys.Player_Idle).setFixedRotation()
+            
+            // set collisions
+            playerSprite.setOnCollide((data: MatterJS.ICollisionPair) => {
+                if(data.bodyA instanceof Player)
+                    data.bodyA.playerIsGrounded = true
+                else if(data.bodyB instanceof Player)
+                    data.bodyB.playerIsGrounded = true
+            })
+            
+            // create new player
+            var newPlayer = new Player(playerSprite, message.clientId)
+
+            // add new player to player this
+            this.players[message.clientId] = newPlayer
+        }
+
+        // TODO: 
+        // handle player disconnect
     }
 }
