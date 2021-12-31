@@ -5,7 +5,7 @@ import TextureKeys from '../consts/TextureKeys'
 import SceneKeys from '~/consts/SceneKeys'
 import AnimiationKeys from '~/consts/AnimationKeys'
 import Player from '~/player/Player'
-import MessageTypes from '~/../../shared/MessageTypes'
+import MessageTypes from '../shared/MessageTypes'
 import { IPlayerInputMessage } from '~/types/IPlayerInputMessage'
 
 export default class WorldScene extends Phaser.Scene
@@ -41,6 +41,8 @@ export default class WorldScene extends Phaser.Scene
 
     async create()
     {
+        this.players = new Map<string, Player>();
+
         // Colyseus
         // Connect this client world renderer to Colyseus game server
         this.room = await this.client.joinOrCreate('my_room', {"is_world_client": 1})
@@ -76,7 +78,7 @@ export default class WorldScene extends Phaser.Scene
     }
 
     update(time: number, delta: number): void {
-        this.players.forEach(player => {
+        this.players.forEach(function(player, clientId, map) {
             player.updatePlayer()
         })
     }

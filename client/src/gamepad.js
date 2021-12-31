@@ -584,10 +584,10 @@ const GamePad = (function(){
           this.y = layout.y;
           this.dx = this.x;
           this.dy = this.y;
-          map["x-dir"] = 0;
-          map["y-dir"] = 0;
-          map["x-axis"] = 0;
-          map["y-axis"] = 0;
+          map["xDir"] = 0;
+          map["yDir"] = 0;
+          map["xAxis"] = 0;
+          map["yAxis"] = 0;
         },
         draw:function()
         {
@@ -648,18 +648,12 @@ const GamePad = (function(){
           {
             if(Math.abs(parseInt(dx)) < (this.radius/2)){this.dx = this.x + dx;}
             if(Math.abs(parseInt(dy)) < (this.radius/2)){this.dy = this.y + dy;}
-            map["x-axis"] = (this.dx - this.x)/(this.radius/2);
-            map["y-axis"] = (this.dy - this.y)/(this.radius/2);
-            map["x-dir"] = Math.round(map["x-axis"]);
-            map["y-dir"] = Math.round(map["y-axis"]);
+            map["xAxis"] = (this.dx - this.x)/(this.radius/2);
+            map["yAxis"] = (this.dy - this.y)/(this.radius/2);
+            map["xDir"] = Math.round(map["xAxis"]);
+            map["yDir"] = Math.round(map["yAxis"]);
 
-            events.trigger('stick-touchmove', {
-              "name": "stick",
-              "x-axis": map["x-axis"],
-              "y-axis": map["y-axis"],
-              "x-dir": map["x-dir"],
-              "y-dir": map["y-dir"]
-            });
+            events.trigger("stick-touchmove", map);
   
             if(dist > (this.radius*2.5))
             {
@@ -675,10 +669,10 @@ const GamePad = (function(){
         {
           this.dx = this.x;
           this.dy = this.y;
-          map["x-dir"] = 0;
-          map["y-dir"] = 0;
-          map["x-axis"] = 0;
-          map["y-axis"] = 0;
+          map["xDir"] = 0;
+          map["yDir"] = 0;
+          map["xAxis"] = 0;
+          map["yAxis"] = 0;
         }
       }
     }
@@ -757,10 +751,7 @@ const GamePad = (function(){
 
                   controller.buttons.state(id, n);
                   if(map[name] == 1) {
-                    events.trigger(eventName, {
-                      ...button,
-                      state: map[name]
-                    });
+                    events.trigger(eventName, map);
                   }
                 }
               break;
@@ -776,10 +767,7 @@ const GamePad = (function(){
 
                   controller.buttons.state(id, n);
                   if(map[name] == 0) {
-                    events.trigger(eventName, {
-                      ...button,
-                      state: map[name]
-                    });
+                    events.trigger(eventName, map);
                   }
                 }
               break;
@@ -798,10 +786,7 @@ const GamePad = (function(){
               if(touches[id].id == buttons_layout[n].name)
               {
                 controller.buttons.reset(n);
-                events.trigger(`${buttons_layout[n].name}-${type}`, {
-                  ...button,
-                  state: map[name]
-                });
+                events.trigger(`${buttons_layout[n].name}-${type}`, map);
               }
             }
             if(touches[id]){delete touches[id];}

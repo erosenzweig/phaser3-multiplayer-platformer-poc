@@ -3,8 +3,8 @@
 	"version": "1.0.0",
 	"description": "The Phaser3.5 game client that renders the dont_troll_me world",
 	"scripts": {
-		"world": "parcel --no-autoinstall src/index.html -p 8001",
-		"build": "parcel --no-autoinstall build src/index.html --out-dir dist",
+		"world": "parcel src/index.html -p 8001",
+		"build": "parcel build src/index.html --out-dir dist",
 		"test": "echo \"Error: no test specified\" && exit 1",
 		"lint": "eslint ./src --ext .js,.jsx,.ts,.tsx"
 	},

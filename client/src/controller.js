@@ -1,5 +1,6 @@
 import { GamePad } from "./gamepad";
 import * as Colyseus from "colyseus.js";
+import MessageTypes from "../../shared/MessageTypes";
 
 var client = new Colyseus.Client("ws://localhost:2567");
 
@@ -7,20 +8,20 @@ client.joinOrCreate("my_room").then(room => {
   function send_input(input) {
     data = {
       ...input,
-      "client_id": room.sessionId
+      "msgType": MessageTypes.Player_Input_Update,
+      "clientId": room.sessionId
     };
-
-    room.send("client_input", data);
+    room.send(MessageTypes.Player_Input_Update, data);
   }
 
   console.log(`${room.sessionId} joined ${room.name}`);
 
   GamePad.setup({
     canvas: "controller",
+    debug: true,
+    trace: true,
     start: {name: "start", key: "b"},
     select: {name: "select", key: "v"},
-    trace: true,
-    debug: true,
     hint: true,
     buttons: [
       {name: "a", "key": "d"},
@@ -34,29 +35,40 @@ client.joinOrCreate("my_room").then(room => {
     console.log(`message received: ${message}`);
   });
 
-  GamePad.cEvents.on("a-touchstart", function(e) {
-    send_input(e);
+  room.onMessage(MessageTypes.Server_No_World_Client, function(message) {
+    console.log("No world client connected to server");
   });
-  GamePad.cEvents.on("b-touchstart", function(e) {
-    send_input(e);
+
+  room.onMessage(MessageTypes.Server_World_Client_Connected, function(messsage){
+    console.log("World Client connected to server");
   });
-  GamePad.cEvents.on("x-touchstart", function(e) {
-    send_input(e);
+
+  room.onStateChange(function(state){
+    console.log("state changed: ");
+    console.dir(state);
   });
-  GamePad.cEvents.on("y-touchstart", function(e) {
-    send_input(e);
-  });
-  GamePad.cEvents.on("start-touchstart", function(e) {
-    send_input(e);
-  });
-  GamePad.cEvents.on("select-touchstart", function(e) {
-    send_input(e);
-  });
-  GamePad.cEvents.on("stick-touchmove", function(e) {
-    send_input(e);
+
+  var gamepadButtonEvents = [
+    "a-touchstart",
+    "a-touchend",
+    "b-touchstart",
+    "b-touchend",
+    "x-touchstart",
+    "x-touchend",
+    "y-touchstart",
+    "y-touchend",
+    "start-touchstart",
+    "start-touchend",
+    "select-touchstart",
+    "select-touchend",
+    "stick-touchmove"
+  ]
+
+  gamepadButtonEvents.forEach(function(ev){
+    GamePad.cEvents.on(ev, function(e) {
+      send_input(e);
+    });
   });
 }).catch(e => {
   console.log("JOIN ERROR", e);
 });
-
-
