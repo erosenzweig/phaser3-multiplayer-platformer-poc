@@ -49,11 +49,15 @@ export default class WorldScene extends Phaser.Scene
 
         console.log(`joined room: ${this.room.name}`)
 
-        this.room.onMessage('keydown', this.handleServerMessage)
-
-        // Tilemaps / World 
-        // Animated Tilemaps Reference
-        // https://phaser.discourse.group/t/how-to-show-tilemap-animated-tiles-in-phaser-game/9972/2
+        // register MessageTypes. used for client connect and disconnect
+        this.room.onMessage(
+            MessageTypes.Player_Connected, 
+            this.handleServerMessage.bind(this)
+        )
+        this.room.onMessage(
+            MessageTypes.Player_Disconnected, 
+            this.handleServerMessage.bind(this)
+        )
 
         this.map = this.make.tilemap({key: "forest_map", tileWidth: 16, tileHeight: 16})
         const tileset = this.map.addTilesetImage("forest_tileset", TextureKeys.ForestTiles)
@@ -68,19 +72,30 @@ export default class WorldScene extends Phaser.Scene
         objectsLayer.objects.forEach(objData => {
             const { name } = objData
 
-            if(name == "player-spawn")
+            if(name == "player-spawn") {
+                console.log("setting player_spawn_point")
+                console.log(objData)
                 this.player_spawn_point = objData
-        })
+            }
+        }, this)
 
         // Animations
         // Load player animations into scene 
         this.createPlayerAnims()
+
+        // // register handler for statechanges. used for client input
+        // this.room.onStateChange(this.handleStateChange.bind(this))
+
+        // Tilemaps / World 
+        // Animated Tilemaps Reference
+        // https://phaser.discourse.group/t/how-to-show-tilemap-animated-tiles-in-phaser-game/9972/2
+        
     }
 
     update(time: number, delta: number): void {
-        this.players.forEach(function(player, clientId, map) {
-            player.updatePlayer()
-        })
+        this.players.forEach(function (player: Player, key: string, map: Map<string, Player>) {
+            player.updatePlayer()  
+        }, this)
     }
 
     createPlayerAnims()
@@ -140,27 +155,19 @@ export default class WorldScene extends Phaser.Scene
 
     handleServerMessage(message: any)
     {
-        if(!message.clientId)
-            return
         if(!message.msgType)
+        {
+            console.log("message has no msgType")
             return
-        
-        if(message.msgType === MessageTypes.Player_Input_Update)
-        {
-            this.players[message.clientId].setInput(message as IPlayerInputMessage)
         }
-        else if(message.msgType === MessageTypes.Player_Connected) 
-        {
-            if(!this.player_spawn_point) {
-                console.log("No player spawn point set")
-                return
-            }
 
+        if(message.msgType == MessageTypes.Player_Connected) 
+        {
             // create new player sprite
-            var playerSprite = this.matter.add.sprite((this.player_spawn_point.x || 0) + ((this.player_spawn_point.width || 0) * 0.5), (this.player_spawn_point.y || 0), AnimiationKeys.Player_Idle).play(AnimiationKeys.Player_Idle).setFixedRotation()
+            var playerSprite = this.matter.add.sprite((this.player_spawn_point?.x || 0) + ((this.player_spawn_point?.width || 0) * 0.5), (this.player_spawn_point?.y || 0), AnimiationKeys.Player_Idle).play(AnimiationKeys.Player_Idle).setFixedRotation()
             
             // set collisions
-            playerSprite.setOnCollide((data: MatterJS.ICollisionPair) => {
+            playerSprite.setOnCollide(function(data: MatterJS.ICollisionPair) {
                 if(data.bodyA instanceof Player)
                     data.bodyA.playerIsGrounded = true
                 else if(data.bodyB instanceof Player)
@@ -171,10 +178,29 @@ export default class WorldScene extends Phaser.Scene
             var newPlayer = new Player(playerSprite, message.clientId)
 
             // add new player to player this
-            this.players[message.clientId] = newPlayer
+            this.players.set(message.clientId, newPlayer)
         }
+        else if(message.msgType == MessageTypes.Player_Disconnected)
+        {
+            if(this.players.has(message.clientId))
+            {
+                console.log(`Deleting player ${message.clientId} because of disconnect`)
+                this.players.delete(message.clientId)   
+            }
+        }
+    }
 
-        // TODO: 
-        // handle player disconnect
+    handleStateChange(state: any)
+    {
+        if(!state.currentClientInputs)
+            return
+
+        for (const newInput in state.currentClientInputs)
+        {
+            if(this.players.has(newInput.clientId)) {
+                console.log("updating player input data ", newInput.clientId)
+                this.players[newInput.clientId].setInput(newInput as IPlayerInputMessage)
+            }
+        }
     }
 }
