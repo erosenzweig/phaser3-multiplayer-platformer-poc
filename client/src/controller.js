@@ -5,13 +5,8 @@ import MessageTypes from "../../shared/MessageTypes";
 var client = new Colyseus.Client("ws://localhost:2567");
 
 client.joinOrCreate("my_room").then(room => {
-  function send_input(input) {
-    data = {
-      ...input,
-      "msgType": MessageTypes.Player_Input_Update,
-      "clientId": room.sessionId
-    };
-    room.send(MessageTypes.Player_Input_Update, data);
+  function send_new_input(input) {
+    room.send(MessageTypes.Player_Input_Update, input)
   }
 
   console.log(`${room.sessionId} joined ${room.name}`);
@@ -30,11 +25,7 @@ client.joinOrCreate("my_room").then(room => {
       {name: "y", "key": "a"}
     ]
   });
-
-  room.onMessage("echo", function(message) {
-    console.log(`message received: ${message}`);
-  });
-
+  
   room.onMessage(MessageTypes.Server_No_World_Client, function(message) {
     console.log("No world client connected to server");
   });
@@ -43,9 +34,9 @@ client.joinOrCreate("my_room").then(room => {
     console.log("World Client connected to server");
   });
 
-  room.onStateChange(function(state){
+  room.onStateChange((state) => {
     console.log("state changed: ");
-    console.dir(state);
+    console.log(state);
   });
 
   var gamepadButtonEvents = [
@@ -64,9 +55,9 @@ client.joinOrCreate("my_room").then(room => {
     "stick-touchmove"
   ]
 
-  gamepadButtonEvents.forEach(function(ev){
-    GamePad.cEvents.on(ev, function(e) {
-      send_input(e);
+  gamepadButtonEvents.forEach(ev => {
+    GamePad.cEvents.on(ev, e => {
+      send_new_input(e);
     });
   });
 }).catch(e => {

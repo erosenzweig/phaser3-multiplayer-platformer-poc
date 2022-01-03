@@ -1,5 +1,5 @@
 import AnimiationKeys from "~/consts/AnimationKeys"
-import { IPlayerInputMessage } from "~/types/IPlayerInputMessage"
+import { PlayerInput } from "~/types/PlayerInput"
 
 export default class Player {
     sprite: Phaser.Physics.Matter.Sprite
@@ -9,7 +9,7 @@ export default class Player {
     jumpForce: number
     jumpJustPressed: boolean
     clientId: string
-    input?: IPlayerInputMessage
+    input?: PlayerInput
     
     constructor(sprite: Phaser.Physics.Matter.Sprite, clientId)
     {
@@ -22,17 +22,23 @@ export default class Player {
         this.jumpJustPressed = false
     }
 
-    setInput(newInput: IPlayerInputMessage)
+    setInput(newInput: PlayerInput)
     {
         if(!this.input)
         {
-            if(newInput.a == 1)
+            if(newInput.a == 1) {
+                console.log()
                 this.jumpJustPressed = true
-            
-            this.input = newInput
+            }
+            else 
+                this.jumpJustPressed = false
         }
-        else 
+        else {
             this.jumpJustPressed = (this.input.a == 0 && newInput.a == 1) ? true : false
+            console.log(`jumpJustPressed ${this.jumpJustPressed}`)
+        }
+
+        this.input = newInput
     }
 
     updatePlayer()

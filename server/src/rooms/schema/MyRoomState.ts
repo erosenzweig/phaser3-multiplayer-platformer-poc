@@ -1,8 +1,7 @@
 import { Schema, MapSchema, Context, type } from "@colyseus/schema"
-import { PlayerInputMessage } from "../../types/PlayerInputMessage"
+import { Player } from "../../types/Player"
 
 
 export class MyRoomState extends Schema {
-  @type("boolean") worldClientConnected: boolean = false
-  @type({ map: PlayerInputMessage }) currentClientInputs = new MapSchema<PlayerInputMessage>()
+  @type({ map: Player }) players = new MapSchema<Player>()
 }

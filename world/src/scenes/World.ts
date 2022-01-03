@@ -5,8 +5,7 @@ import TextureKeys from '../consts/TextureKeys'
 import SceneKeys from '~/consts/SceneKeys'
 import AnimiationKeys from '~/consts/AnimationKeys'
 import Player from '~/player/Player'
-import MessageTypes from '../shared/MessageTypes'
-import { IPlayerInputMessage } from '~/types/IPlayerInputMessage'
+import { PlayerInput } from '../types/PlayerInput'
 
 export default class WorldScene extends Phaser.Scene
 {
@@ -50,14 +49,7 @@ export default class WorldScene extends Phaser.Scene
         console.log(`joined room: ${this.room.name}`)
 
         // register MessageTypes. used for client connect and disconnect
-        this.room.onMessage(
-            MessageTypes.Player_Connected, 
-            this.handleServerMessage.bind(this)
-        )
-        this.room.onMessage(
-            MessageTypes.Player_Disconnected, 
-            this.handleServerMessage.bind(this)
-        )
+        this.room.onStateChange(this.handleStateChange.bind(this))
 
         this.map = this.make.tilemap({key: "forest_map", tileWidth: 16, tileHeight: 16})
         const tileset = this.map.addTilesetImage("forest_tileset", TextureKeys.ForestTiles)
@@ -93,9 +85,36 @@ export default class WorldScene extends Phaser.Scene
     }
 
     update(time: number, delta: number): void {
-        this.players.forEach(function (player: Player, key: string, map: Map<string, Player>) {
-            player.updatePlayer()  
-        }, this)
+        this.players.forEach((player: Player) => {
+            player.updatePlayer()
+        })
+    }
+
+    createNewPlayerSprite(clientId: string)
+    {
+        // create new player sprite
+        var playerSprite = this.matter.add.sprite((this.player_spawn_point?.x || 0) + ((this.player_spawn_point?.width || 0) * 0.5), (this.player_spawn_point?.y || 0), AnimiationKeys.Player_Idle).play(AnimiationKeys.Player_Idle).setFixedRotation()
+        
+        // tag sprite with client ID for references in collisions 
+        playerSprite.clientId = clientId
+
+        // set collisions
+        playerSprite.setOnCollide((data: MatterJS.ICollisionPair) => {
+            if(data.bodyA.gameObject.clientId) {
+                const collisionPlayer = this.players.get(data.bodyA.gameObject.clientId)
+                if(collisionPlayer) {
+                    collisionPlayer.playerIsGrounded = true
+                }
+            }
+            else if(data.bodyB.gameObject.clientId) {
+                const collisionPlayer = this.players.get(data.bodyB.gameObject.clientId)
+                if(collisionPlayer) {
+                    collisionPlayer.playerIsGrounded = true
+                }
+            }
+        })
+
+        return playerSprite
     }
 
     createPlayerAnims()
@@ -153,54 +172,48 @@ export default class WorldScene extends Phaser.Scene
         })
     }
 
-    handleServerMessage(message: any)
-    {
-        if(!message.msgType)
-        {
-            console.log("message has no msgType")
-            return
-        }
-
-        if(message.msgType == MessageTypes.Player_Connected) 
-        {
-            // create new player sprite
-            var playerSprite = this.matter.add.sprite((this.player_spawn_point?.x || 0) + ((this.player_spawn_point?.width || 0) * 0.5), (this.player_spawn_point?.y || 0), AnimiationKeys.Player_Idle).play(AnimiationKeys.Player_Idle).setFixedRotation()
-            
-            // set collisions
-            playerSprite.setOnCollide(function(data: MatterJS.ICollisionPair) {
-                if(data.bodyA instanceof Player)
-                    data.bodyA.playerIsGrounded = true
-                else if(data.bodyB instanceof Player)
-                    data.bodyB.playerIsGrounded = true
-            })
-            
-            // create new player
-            var newPlayer = new Player(playerSprite, message.clientId)
-
-            // add new player to player this
-            this.players.set(message.clientId, newPlayer)
-        }
-        else if(message.msgType == MessageTypes.Player_Disconnected)
-        {
-            if(this.players.has(message.clientId))
-            {
-                console.log(`Deleting player ${message.clientId} because of disconnect`)
-                this.players.delete(message.clientId)   
-            }
-        }
-    }
-
     handleStateChange(state: any)
     {
-        if(!state.currentClientInputs)
+        if(!state.players)
             return
-
-        for (const newInput in state.currentClientInputs)
-        {
-            if(this.players.has(newInput.clientId)) {
-                console.log("updating player input data ", newInput.clientId)
-                this.players[newInput.clientId].setInput(newInput as IPlayerInputMessage)
+        
+        // handle player disconnect
+        this.players.forEach(p => {
+            if(!state.players.get(p.clientId)) {
+                console.log(`client ${p.clientId} disconnected. deleting.`)
+                const player = this.players.get(p.clientId)
+                player?.sprite.destroy()
+                this.players.delete(p.clientId)
             }
-        }
+        })
+        
+        // update existing player input if exists, 
+        // otherwise create new player and add to game world
+        state.players.forEach(playerMap => {
+            const player = this.players.get(playerMap.clientId)
+            if (player) {
+                // player already exists, update input
+                console.log(`updating input for player ${playerMap.clientId}`)
+                player.setInput(new PlayerInput(
+                    playerMap.currentInput.x,
+                    playerMap.currentInput.y,
+                    playerMap.currentInput.a,
+                    playerMap.currentInput.b,
+                    playerMap.currentInput.select,
+                    playerMap.currentInput.start,
+                    playerMap.currentInput.xAxis,
+                    playerMap.currentInput.xDir,
+                    playerMap.currentInput.yAxis,
+                    playerMap.currentInput.yDir
+                ))
+            } else {
+                const newPlayer = new Player(
+                    this.createNewPlayerSprite(playerMap.clientId),
+                    playerMap.clientId
+                )
+
+                this.players.set(playerMap.clientId, newPlayer)
+            }
+        });
     }
 }

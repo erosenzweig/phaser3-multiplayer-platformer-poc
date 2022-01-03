@@ -1,7 +1,7 @@
 
 import { Schema, MapSchema, Context, type } from "@colyseus/schema"
 
-export class PlayerInputMessage extends Schema{
+export class PlayerInput extends Schema{
     @type("number") x: number
     @type("number") y: number
     @type("number") a: number
@@ -12,11 +12,8 @@ export class PlayerInputMessage extends Schema{
     @type("number") xDir: number
     @type("number") yAxis: number
     @type("number") yDir: number
-    @type("string") msgType: string
-    @type("string") clientId: string
   
     constructor(
-        clientId: string,
         x?: number,
         y?: number,
         a?: number,
@@ -26,11 +23,9 @@ export class PlayerInputMessage extends Schema{
         xAxis?: number,
         xDir?: number,
         yAxis?: number,
-        yDir?: number,
-        msgType?: string
+        yDir?: number
     ) {
       super()
-      this.clientId = clientId
       this.x = x || 0
       this.y = y || 0
       this.a = a || 0
@@ -41,6 +36,5 @@ export class PlayerInputMessage extends Schema{
       this.xDir = xDir || 0
       this.yAxis = yAxis || 0
       this.yDir = yDir || 0
-      this.msgType = msgType || ""
     }
   }
